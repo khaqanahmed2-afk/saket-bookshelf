@@ -1,38 +1,31 @@
-import { users, type User, type InsertUser } from "@shared/schema";
-
-// This file is kept minimal as we are using Supabase for the main data storage
-// as per the user's request. 
-// The 'storage' interface here is mainly for compatibility with the template structure
-// or for any non-Supabase local storage needs.
+import { type Customer, type InsertCustomer } from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUser(id: string): Promise<Customer | undefined>;
+  getUserByUsername(username: string): Promise<Customer | undefined>;
+  createUser(user: InsertCustomer): Promise<Customer>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  currentId: number;
+  private users: Map<string, Customer>;
 
   constructor() {
     this.users = new Map();
-    this.currentId = 1;
   }
 
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: string): Promise<Customer | undefined> {
     return this.users.get(id);
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(username: string): Promise<Customer | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.mobile === username,
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
-    const user: User = { ...insertUser, id };
+  async createUser(insertUser: InsertCustomer): Promise<Customer> {
+    const id = crypto.randomUUID();
+    const user: Customer = { ...insertUser, id, pin: null, createdAt: new Date() };
     this.users.set(id, user);
     return user;
   }
