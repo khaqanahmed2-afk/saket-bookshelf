@@ -25,56 +25,75 @@ export async function registerRoutes(
   app.post(api.auth.checkMobile.path, async (req, res) => {
     try {
       const { mobile } = api.auth.checkMobile.input.parse(req.body);
-      const { data: customer } = await supabase
+      const { data: customer, error: fetchError } = await supabase
         .from("customers")
         .select("id, pin")
         .eq("mobile", mobile)
-        .single();
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.error("Supabase fetch error:", fetchError);
+        return res.json({ exists: false });
+      }
       
       res.json({ exists: !!customer && !!customer.pin });
     } catch (error) {
+      console.error("Check mobile error:", error);
       res.json({ exists: false });
     }
   });
 
   app.post(api.auth.setupPin.path, async (req, res) => {
     try {
+      console.log("Setting up PIN for mobile:", req.body.mobile);
       const { mobile, pin } = api.auth.setupPin.input.parse(req.body);
       const hashedPin = await bcrypt.hash(pin, 10);
       
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from("customers")
         .select("id")
         .eq("mobile", mobile)
-        .single();
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Supabase fetch error:", fetchError);
+        return res.status(500).json({ message: "Database connection failed" });
+      }
 
       if (existing) {
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from("customers")
           .update({ pin: hashedPin })
           .eq("mobile", mobile);
-        if (error) return res.status(400).json({ message: error.message });
+        if (updateError) return res.status(400).json({ message: updateError.message });
       } else {
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from("customers")
           .insert({ mobile, name: "New Customer", pin: hashedPin });
-        if (error) return res.status(400).json({ message: error.message });
+        if (insertError) return res.status(400).json({ message: insertError.message });
       }
 
       res.json({ success: true, session: { mobile } });
     } catch (error: any) {
+      console.error("PIN setup error:", error);
       res.status(400).json({ message: error.message });
     }
   });
 
   app.post(api.auth.loginPin.path, async (req, res) => {
     try {
+      console.log("Login attempt for mobile:", req.body.mobile);
       const { mobile, pin } = api.auth.loginPin.input.parse(req.body);
-      const { data: customer } = await supabase
+      const { data: customer, error: fetchError } = await supabase
         .from("customers")
         .select("*")
         .eq("mobile", mobile)
-        .single();
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Supabase fetch error:", fetchError);
+        return res.status(500).json({ message: "Database connection failed" });
+      }
 
       if (!customer || !customer.pin) {
         return res.status(401).json({ message: "Mobile not registered" });
@@ -87,6 +106,7 @@ export async function registerRoutes(
 
       res.json({ success: true, session: { mobile, id: customer.id } });
     } catch (error: any) {
+      console.error("Login error:", error);
       res.status(401).json({ message: error.message });
     }
   });
