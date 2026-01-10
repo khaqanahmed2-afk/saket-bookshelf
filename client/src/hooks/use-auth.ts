@@ -83,6 +83,6 @@ export function useAuth() {
     loginWithPin,
     signOut,
     // Add compatibility for existing code
-    phone: user?.mobile
+    phone: user?.mobile || user?.phone
   };
 }

@@ -112,6 +112,8 @@ export async function registerRoutes(
   });
 
   app.get(api.auth.me.path, async (req, res) => {
+    // In this simple MVP, we check if there is a session in the header or just return null
+    // The frontend uses localStorage for persistence, but we should have a way to verify
     res.json({ user: null });
   });
 
