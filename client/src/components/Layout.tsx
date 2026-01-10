@@ -29,21 +29,20 @@ export function Layout({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="flex items-center gap-4">
+            <Link href="/admin" className={location === '/admin' ? 'text-primary font-medium' : 'text-muted-foreground hover:text-foreground'}>
+              Admin
+            </Link>
             {user ? (
               <div className="flex items-center gap-4">
                 <Link href="/dashboard" className={location === '/dashboard' ? 'text-primary font-medium hidden md:block' : 'text-muted-foreground hover:text-foreground hidden md:block'}>
                   Dashboard
-                </Link>
-                {/* Simple Admin Check - In real app, check role */}
-                <Link href="/admin" className={location === '/admin' ? 'text-primary font-medium hidden md:block' : 'text-muted-foreground hover:text-foreground hidden md:block'}>
-                  Admin
                 </Link>
                 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-white hover:bg-slate-50 transition-colors">
                       <User className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium hidden sm:inline">{user.email || user.phone || 'User'}</span>
+                      <span className="text-sm font-medium hidden sm:inline">{user.email || user.phone || user.mobile || 'User'}</span>
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
