@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { api } from "@shared/routes";
 import { format } from "date-fns";
 import bcrypt from "bcryptjs";
+import { XMLParser } from "fast-xml-parser";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -16,6 +17,11 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANO
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const upload = multer({ storage: multer.memoryStorage() });
+
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: "@_",
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -123,10 +129,34 @@ export async function registerRoutes(
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(sheet);
+      let data: any[] = [];
+      const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
+
+      if (fileExtension === 'xml') {
+        const xmlContent = req.file.buffer.toString('utf-8');
+        const jsonObj = parser.parse(xmlContent);
+        
+        // Tally XML structure usually has ENVELOPE -> BODY -> DATA -> COLLECTION -> VOUCHER
+        // This logic might need refinement based on the exact XML schema provided by the user
+        const collection = jsonObj?.ENVELOPE?.BODY?.IMPORTDATA?.REQUESTDATA?.TALLYMESSAGE || jsonObj?.ENVELOPE?.BODY?.DATA?.COLLECTION?.VOUCHER;
+        
+        if (Array.isArray(collection)) {
+          data = collection.map(v => ({
+            Mobile: v.BASICBUYERADDRESS?.ADDRESS || v.PARTYNAME, // Fallback fields
+            Name: v.PARTYNAME,
+            Date: v.DATE,
+            VoucherNo: v.VOUCHERNUMBER,
+            VoucherType: v.VOUCHERTYPENAME,
+            Debit: v.ALLLEDGERENTRIES_LIST?.[0]?.AMOUNT,
+            Credit: v.ALLLEDGERENTRIES_LIST?.[1]?.AMOUNT,
+          }));
+        }
+      } else {
+        const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        data = XLSX.utils.sheet_to_json(sheet);
+      }
 
       if (supabaseKey === "placeholder") {
         return res.json({
@@ -169,8 +199,8 @@ export async function registerRoutes(
 
           const voucherNo = row["VoucherNo"]?.toString() || `V-${Date.now()}-${processed}`;
           const voucherType = row["VoucherType"]?.toString()?.toLowerCase();
-          const debit = parseFloat(row["Debit"] || 0);
-          const credit = parseFloat(row["Credit"] || 0);
+          const debit = Math.abs(parseFloat(row["Debit"] || 0));
+          const credit = Math.abs(parseFloat(row["Credit"] || 0));
           
           await supabase.from('ledger').upsert({
             customer_id: customerId,
@@ -182,7 +212,7 @@ export async function registerRoutes(
           }, { onConflict: 'voucher_no' });
 
           if (voucherType === 'sales' || voucherType === 'bill') {
-             const billAmount = parseFloat(row["Amount"] || debit);
+             const billAmount = Math.abs(parseFloat(row["Amount"] || debit));
              await supabase.from('bills').upsert({
                 customer_id: customerId,
                 bill_no: voucherNo,
@@ -190,7 +220,7 @@ export async function registerRoutes(
                 amount: billAmount
              }, { onConflict: 'bill_no' });
           } else if (voucherType === 'receipt' || voucherType === 'payment') {
-             const paymentAmount = parseFloat(row["Amount"] || credit);
+             const paymentAmount = Math.abs(parseFloat(row["Amount"] || credit));
              const refNo = row["Reference"]?.toString() || voucherNo;
              const { data: existingPayment } = await supabase.from('payments').select('id').eq('reference_no', refNo).single();
              if (!existingPayment) {
@@ -205,11 +235,13 @@ export async function registerRoutes(
           }
           processed++;
         } catch (err) {
+          console.error("Row processing error:", err);
           errors++;
         }
       }
       res.json({ message: "File processed successfully", stats: { processed, errors } });
     } catch (error) {
+      console.error("Upload error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
