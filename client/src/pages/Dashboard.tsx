@@ -6,10 +6,14 @@ import { StatCard } from "@/components/StatCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Wallet, ShoppingCart, Receipt, ArrowDownToLine, Loader2, Calendar } from "lucide-react";
+import { Wallet, ShoppingCart, Receipt, ArrowDownToLine, Loader2, Calendar, Lock } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area
+} from 'recharts';
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -74,13 +78,53 @@ export default function Dashboard() {
     doc.save(`Bill_${bill.billNo}.pdf`);
   };
 
+  /**
+   * Aggregates ledger data by month for Recharts
+   */
+  const getChartData = () => {
+    if (!ledger) return [];
+    
+    const monthlyData: Record<string, { month: string; purchase: number; paid: number; balance: number }> = {};
+    
+    // Sort ledger by date ascending for trend
+    const sortedLedger = [...ledger].sort((a, b) => new Date(a.entryDate).getTime() - new Date(b.entryDate).getTime());
+    
+    sortedLedger.forEach(entry => {
+      const date = new Date(entry.entryDate);
+      const monthKey = format(date, 'MMM yyyy');
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = { month: monthKey, purchase: 0, paid: 0, balance: 0 };
+      }
+      
+      monthlyData[monthKey].purchase += Number(entry.debit);
+      monthlyData[monthKey].paid += Number(entry.credit);
+      monthlyData[monthKey].balance = Number(entry.balance);
+    });
+    
+    return Object.values(monthlyData);
+  };
+
+  const chartData = getChartData();
+
   return (
     <Layout>
       <div className="bg-slate-50 min-h-screen pb-20">
         <div className="bg-primary/5 pb-20 pt-10 px-4">
           <div className="container mx-auto">
-            <h1 className="text-3xl font-display font-bold mb-2">Hello, {customer?.name || "Customer"}!</h1>
-            <p className="text-muted-foreground">Here is your financial overview.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-display font-bold mb-2">Hello, {customer?.name || "Customer"}!</h1>
+                <p className="text-muted-foreground">Here is your financial overview.</p>
+              </div>
+              <button 
+                onClick={() => setLocation("/change-pin")}
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:bg-primary/5 px-4 py-2 rounded-xl transition-colors border border-primary/20 bg-white"
+              >
+                <Lock className="w-4 h-4" />
+                Change PIN
+              </button>
+            </div>
           </div>
         </div>
 
@@ -108,6 +152,60 @@ export default function Dashboard() {
               color="blue" 
               delay={200} 
             />
+          </div>
+
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <Card className="rounded-3xl border-none shadow-md overflow-hidden bg-white">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5 text-orange-500" />
+                  Monthly Purchases
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px] pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      cursor={{ fill: '#f8fafc' }}
+                    />
+                    <Bar dataKey="purchase" fill="#f97316" radius={[4, 4, 0, 0]} barSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-none shadow-md overflow-hidden bg-white">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-green-500" />
+                  Monthly Payments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="h-[300px] pt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData}>
+                    <defs>
+                      <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                    />
+                    <Area type="monotone" dataKey="paid" stroke="#22c55e" fillOpacity={1} fill="url(#colorPaid)" strokeWidth={3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Main Content Tabs */}

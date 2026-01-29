@@ -117,6 +117,40 @@ export async function registerRoutes(
     }
   });
 
+  app.post(api.auth.changePin.path, async (req, res) => {
+    try {
+      const { mobile, oldPin, newPin } = api.auth.changePin.input.parse(req.body);
+      
+      const { data: customer, error: fetchError } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("mobile", mobile)
+        .maybeSingle();
+
+      if (fetchError || !customer || !customer.pin) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const valid = await bcrypt.compare(oldPin, customer.pin);
+      if (!valid) {
+        return res.status(401).json({ message: "Incorrect old PIN" });
+      }
+
+      const hashedPin = await bcrypt.hash(newPin, 10);
+      const { error: updateError } = await supabase
+        .from("customers")
+        .update({ pin: hashedPin })
+        .eq("mobile", mobile);
+
+      if (updateError) throw updateError;
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Change PIN error:", error);
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   app.get(api.auth.me.path, async (req, res) => {
     // In this simple MVP, we check if there is a session in the header or just return null
     // The frontend uses localStorage for persistence, but we should have a way to verify
@@ -201,13 +235,14 @@ export async function registerRoutes(
           const voucherType = row["VoucherType"]?.toString()?.toLowerCase();
           const debit = Math.abs(parseFloat(row["Debit"] || 0));
           const credit = Math.abs(parseFloat(row["Credit"] || 0));
+          const balance = parseFloat(row["Balance"] || 0); // Preserve sign for balance trend
           
           await supabase.from('ledger').upsert({
             customer_id: customerId,
             entry_date: formattedDate,
             debit: debit,
             credit: credit,
-            balance: 0,
+            balance: balance,
             voucher_no: voucherNo
           }, { onConflict: 'voucher_no' });
 

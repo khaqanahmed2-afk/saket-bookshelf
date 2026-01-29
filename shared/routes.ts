@@ -42,6 +42,20 @@ export const api = {
         200: z.object({ success: z.boolean() }),
       },
     },
+    changePin: {
+      method: "POST" as const,
+      path: "/api/auth/change-pin",
+      input: z.object({
+        mobile: z.string(),
+        oldPin: z.string().length(4),
+        newPin: z.string().length(4),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: z.object({ message: z.string() }),
+        401: z.object({ message: z.string() }),
+      },
+    },
   },
   admin: {
     uploadTally: {

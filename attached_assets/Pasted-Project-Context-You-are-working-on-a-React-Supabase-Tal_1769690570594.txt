@@ -1,0 +1,130 @@
+Project Context
+
+You are working on a React + Supabase Tally Dashboard web app for Saket Pustak Kendra.
+
+Tech Stack:
+
+Frontend: React, Tailwind CSS, Recharts
+
+Backend: Supabase (Auth, Database, RLS)
+
+File Parsing: Tally XML + Excel
+
+Features already implemented:
+
+Customer login (mobile + PIN)
+
+Admin panel for XML/Excel upload
+
+Live dashboard (total purchase, paid, pending)
+
+Ledger & bills with PDF download
+
+Supabase database integration
+
+The system is functional but needs final professional features.
+
+✅ TASK 1: Implement "Change PIN" Feature
+UI Requirements:
+
+Create a new page/component: ChangePin.jsx
+
+Form fields:
+
+Old PIN
+
+New PIN
+
+Confirm New PIN
+
+Logic Requirements:
+
+Fetch current user from Supabase.
+
+Verify old PIN with database.
+
+Validate new PIN:
+
+Must be 4 digits
+
+New PIN === Confirm PIN
+
+Update PIN in Supabase.
+
+Show success/error messages with UI feedback.
+
+Protect route (only logged-in users can access).
+
+✅ TASK 2: Add Dashboard Charts (Recharts)
+Charts to implement:
+
+Monthly Purchases Chart
+
+Monthly Payments Chart
+
+Pending Balance Trend Chart
+
+Steps:
+
+Aggregate ledger data by month from Supabase.
+
+Transform data into Recharts format.
+
+Add responsive charts in Dashboard.jsx.
+
+Ensure charts work on mobile and desktop.
+
+✅ TASK 3: Improve XML & Excel Parser
+Requirements:
+
+Support custom Tally XML schema.
+
+Normalize data:
+
+Dates
+
+Amounts
+
+Customer names
+
+Add error handling for invalid records.
+
+Ensure consistent database insert structure.
+
+✅ TASK 4: Mobile Responsiveness & UI Polish
+Requirements:
+
+Make ledger table mobile-friendly (scroll/card view).
+
+Improve dashboard card layout on small screens.
+
+Optimize fonts, spacing, and buttons.
+
+Add loading states and skeleton UI.
+
+✅ TASK 5: Supabase Security (RLS)
+Requirements:
+
+Implement Row Level Security:
+
+Customers can only access their own records.
+
+Admin has full access.
+
+Secure sensitive tables.
+
+Validate all queries.
+
+✅ Output Expectations
+
+Write clean, modular React code.
+
+Use reusable components.
+
+Follow best practices for Supabase queries.
+
+Add comments for clarity.
+
+Do not break existing features.
+
+Show only necessary code changes.
