@@ -41,7 +41,7 @@ DATABASE_URL=postgres://...
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-repo/saket-bookshelf.git
+    git clone https://github.com/khaqanahmed2-afk/saket-bookshelf.git
     cd saket-bookshelf
     ```
 
