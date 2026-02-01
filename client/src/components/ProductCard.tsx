@@ -13,8 +13,22 @@ export function ProductCard({ product }: ProductCardProps) {
     const [hasError, setHasError] = useState(false);
 
     const handleWhatsAppClick = () => {
-        const message = encodeURIComponent(`Hello, I want to know the price for ${product.name}`);
+        // Enhanced message with product details and website reference
+        const message = encodeURIComponent(
+            `Hi! I'm interested in:\n📚 ${product.name}\n\nCould you please share the price and availability?\n\n👉 Seen on: https://saketpustakkendra.in`
+        );
         const phoneNumber = "917754057200";
+
+        // Track conversion with Google Analytics (if configured)
+        if (typeof window !== 'undefined' && (window as any).gtag) {
+            (window as any).gtag('event', 'whatsapp_click', {
+                'event_category': 'engagement',
+                'event_label': product.name,
+                'product_category': product.category,
+                'value': 1
+            });
+        }
+
         window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
     };
 
@@ -33,7 +47,7 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="aspect-square relative overflow-hidden bg-slate-50 p-6 flex items-center justify-center">
                 <img
                     src={imgSrc}
-                    alt={product.name}
+                    alt={`${product.name} - ${product.category} | Saket Pustak Kendra`}
                     onError={handleImageError}
                     loading="lazy"
                     className={`object-contain w-full h-full drop-shadow-sm group-hover:scale-110 transition-transform duration-500 ${hasError ? 'opacity-80 grayscale' : ''}`}

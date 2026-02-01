@@ -20,9 +20,37 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
         credentials: "include", // Ensure cookies are sent
     });
 
+    // Safe JSON parsing with content-type validation
+    const contentType = res.headers.get("content-type");
+
     if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Unknown error" }));
-        throw new Error(error.message || `API error: ${res.status}`);
+        // Check if response is JSON before parsing
+        if (contentType?.includes("application/json")) {
+            const error = await res.json().catch(() => ({ message: "Unknown error" }));
+            throw new Error(error.message || `API error: ${res.status}`);
+        } else {
+            // HTML or other non-JSON response - typically firebase.json misconfiguration
+            const text = await res.text();
+            if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+                throw new Error(
+                    `❌ API route returned HTML instead of JSON.\n` +
+                    `This usually means Firebase Hosting is serving index.html for API routes.\n` +
+                    `Check firebase.json rewrites and ensure VITE_API_URL is set correctly.\n` +
+                    `Attempted URL: ${fullUrl}`
+                );
+            }
+            throw new Error(`API error: ${res.status} - ${text.substring(0, 100)}`);
+        }
+    }
+
+    // Verify successful response is JSON
+    if (!contentType?.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(
+            `Expected JSON but received ${contentType || 'unknown type'}.\n` +
+            `Response preview: ${text.substring(0, 100)}\n` +
+            `URL: ${fullUrl}`
+        );
     }
 
     return res.json();

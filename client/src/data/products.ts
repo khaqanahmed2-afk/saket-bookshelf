@@ -14,17 +14,17 @@ export const categories = [
     "Eco-Friendly Products"
 ];
 
-// Reliable Unsplash Image Pools per Category
+// Professional Product Images with White/Light Backgrounds
 const CATEGORY_IMAGES: Record<string, string[]> = {
     "School Essentials": [
-        "https://images.unsplash.com/photo-1531346878377-a513bc95f30f?w=400&q=80", // Notebook
-        "https://images.unsplash.com/photo-1627393436034-7a387532393d?w=400&q=80", // Geometry Box
-        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&q=80", // Bag
-        "https://images.unsplash.com/photo-1606312619070-d48b7065e994?w=400&q=80", // Lunch Box
-        "https://images.unsplash.com/photo-1596495577886-d920f1fb7238?w=400&q=80", // Pencil case
-        "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=400&q=80", // Books
-        "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&q=80", // Education
-        "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&q=80", // Study
+        "/images/products/blue_notebook.png", // 1. Premium Notebook – Blue Color
+        "/images/products/lunch_box_large.png", // 2. Classmate Lunch Box – Large Size
+        "/images/products/red_notebook.png", // 3. Doms Notebook – Red Color
+        "/images/products/water_bottles_pack.png", // 4. Disney Themed Water Bottle – Pack of 6
+        "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&q=80&fit=crop", // 5. Durable Water Bottle – Medium
+        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=400&q=80", // 6. Premium School Bag – Red Color
+        "https://images.unsplash.com/photo-1635351619921-1bb552d45ab3?w=400&q=80&fit=crop", // 7. Spiral Binding Geometry Box – Medium
+        "https://images.unsplash.com/photo-1606312619070-d48b7065e994?w=400&q=80", // 8. Classmate Lunch Box – with Compartments
     ],
     "Office Stationery": [
         "https://images.unsplash.com/photo-1585336261022-680e295ce3fe?w=400&q=80", // Pen

@@ -12,9 +12,7 @@
     "start": "node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "preview": "vite preview --outDir dist/public",
-    "deploy:prod": "npm run build && firebase deploy --only hosting",
-    "deploy:check": "echo 'Make sure VITE_API_URL is set before deploying!'"
+    "preview": "vite preview --outDir dist/public"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -93,20 +93,22 @@ export function Layout({ children }: { children: ReactNode }) {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <a
-                    href="https://www.google.com/maps/search/?api=1&query=Rudauli+Ayodhya+224120+UP"
+                    href="https://share.google/aWPN36et2TcQjLdAo"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-primary transition-colors cursor-pointer inline-flex items-center gap-1"
                   >
-                    📍 Rudauli, Ayodhya – 224120, UP
+                    📍 Saket Pustak Kendra, Rudauli, Ayodhya – 224120, UP
                   </a>
                 </li>
                 <li>
                   <a
-                    href="tel:+917754057200"
+                    href="https://wa.me/917754057200"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="hover:text-primary transition-colors cursor-pointer inline-flex items-center gap-1"
                   >
-                    📞 Mobile: 7754057200
+                    📞 WhatsApp: +91 77540 57200
                   </a>
                 </li>
                 <li>GST: 09AFQPR5141C1ZA</li>

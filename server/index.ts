@@ -17,15 +17,19 @@ import cors from "cors";
 const app = express();
 const httpServer = createServer(app);
 
-// Allow CORS for local development (Vite port 5173)
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    `http://localhost:${process.env.PORT || 5000}`
-  ],
-  credentials: true
-}));
+// CORS configuration - supports local + production via environment variable
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(",")
+      : [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+      ],
+    credentials: true,
+  })
+);
+
 
 // Essential for production behind proxies (like Vercel, Heroku, or Nginx)
 app.set("trust proxy", 1);
@@ -51,11 +55,8 @@ if (!sessionSecret || sessionSecret.length < 32) {
   );
 }
 
-// Cookie security configuration
-const isProduction = process.env.NODE_ENV === "production";
-// ONLY use secure cookies if explicitly requested via env var (for real production HTTPS)
-const secureCookies = process.env.SECURE_COOKIES === "true";
 
+// Session configuration with cross-domain cookie support
 app.use(
   session({
     secret: sessionSecret,
@@ -64,10 +65,10 @@ app.use(
     store,
     name: "saket.sid",
     cookie: {
-      secure: secureCookies,
+      secure: true, // Required for sameSite: "none"
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: "lax",
+      sameSite: "none", // Required for cross-domain (frontend on different domain)
     },
   }),
 );

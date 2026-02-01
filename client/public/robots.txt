@@ -1,0 +1,17 @@
+# Saket Pustak Kendra - Robots.txt
+# https://saketpustakkendra.in/robots.txt
+
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /login
+
+# Block admin and user-specific pages
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /cart
+Disallow: /orders
+Disallow: /change-pin
+
+# Sitemap location
+Sitemap: https://saketpustakkendra.in/sitemap.xml

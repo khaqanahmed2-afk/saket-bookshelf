@@ -174,6 +174,7 @@ export async function processStagingImport(importId: string) {
                 if (!existing) {
                     await tx.insert(products).values({
                         name: row.name,
+                        category: row.category || "Stationery", // Default category if not provided
                         code: row.code,
                         price: row.price,
                         stock: row.stock,

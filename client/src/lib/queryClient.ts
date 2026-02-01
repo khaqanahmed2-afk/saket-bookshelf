@@ -40,7 +40,12 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
     async ({ queryKey }) => {
-      const res = await fetch(queryKey.join("/") as string, {
+      // Use VITE_API_URL if available, otherwise empty for relative URLs
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      const url = queryKey.join("/") as string;
+      const fullUrl = url.startsWith("http") ? url : `${baseUrl}${url}`;
+
+      const res = await fetch(fullUrl, {
         credentials: "include",
       });
 
@@ -49,6 +54,17 @@ export const getQueryFn: <T>(options: {
       }
 
       await throwIfResNotOk(res);
+
+      // Safe JSON parsing with content-type validation
+      const contentType = res.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(
+          `Expected JSON but received ${contentType || 'unknown'}. ` +
+          `Response: ${text.substring(0, 100)}`
+        );
+      }
+
       return await res.json();
     };
 
