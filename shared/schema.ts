@@ -16,10 +16,10 @@ export const importMeta = pgTable("import_meta", {
 });
 
 export const customers = pgTable("customers", {
-
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   mobile: text("mobile").notNull().unique(),
+  customerCode: text("customer_code"), // For XML imports - unique customer identifier
   pin: text("pin"),
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
   source: text("source").default("system"),
@@ -48,6 +48,8 @@ export const bills = pgTable("bills", {
 export const payments = pgTable("payments", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
   customerId: uuid("customer_id").references(() => customers.id),
+  billId: bigint("bill_id", { mode: "number" }).references(() => bills.id), // Link to specific bill
+  receiptNo: text("receipt_no").notNull(), // Receipt/payment number from XML
   paymentDate: date("payment_date").notNull(),
   amount: numeric("amount").notNull(),
   mode: text("mode").notNull(),
@@ -55,11 +57,27 @@ export const payments = pgTable("payments", {
   source: text("source").default("system"),
 });
 
+// XML Upload tracking table
+export const uploadLogs = pgTable("upload_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  fileName: text("file_name").notNull(),
+  fileHash: text("file_hash").notNull().unique(), // SHA-256 hash for duplicate detection
+  uploadType: text("upload_type", { enum: ["customers", "bills", "payments"] }).notNull(),
+  recordsTotal: numeric("records_total").notNull().default("0"),
+  recordsSuccess: numeric("records_success").notNull().default("0"),
+  recordsFailed: numeric("records_failed").notNull().default("0"),
+  recordsSkipped: numeric("records_skipped").notNull().default("0"),
+  errorLog: jsonb("error_log"), // Array of error details
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  status: text("status", { enum: ["success", "partial", "failed"] }).notNull(),
+});
+
 // drizzle-zod's inferred typings can vary across versions; cast omit shape to keep `tsc` stable.
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true } as any);
 export const insertLedgerSchema = createInsertSchema(ledger).omit({ id: true } as any);
 export const insertBillSchema = createInsertSchema(bills).omit({ id: true } as any);
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true } as any);
+export const insertUploadLogSchema = createInsertSchema(uploadLogs).omit({ id: true, uploadedAt: true } as any);
 
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),

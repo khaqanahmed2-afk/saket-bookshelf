@@ -25,6 +25,10 @@ app.use(
       : [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "https://saket-pustak-kendra-database.web.app",
+        "https://saket-pustak-kendra-database.firebaseapp.com",
+        "https://saketpustakkendra.in",
+        "https://www.saketpustakkendra.in",
       ],
     credentials: true,
   })

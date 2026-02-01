@@ -17,6 +17,7 @@ import AddProduct from "@/pages/admin/AddProduct";
 import VyaparSync from "@/pages/admin/VyaparSync";
 import ProductManagement from "@/pages/admin/ProductManagement";
 import ChangePin from "@/pages/ChangePin";
+import DataImport from "@/pages/admin/DataImport";
 
 function Router() {
   return (
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/admin/add-product" component={AddProduct} />
       <Route path="/admin/products" component={ProductManagement} />
       <Route path="/admin/vyapar-sync" component={VyaparSync} />
+      <Route path="/admin/data-import" component={DataImport} />
       <Route path="/change-pin" component={ChangePin} />
       <Route component={NotFound} />
     </Switch>

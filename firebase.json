@@ -14,11 +14,58 @@
         ],
         "headers": [
             {
+                "source": "**",
+                "headers": [
+                    {
+                        "key": "X-Content-Type-Options",
+                        "value": "nosniff"
+                    },
+                    {
+                        "key": "X-Frame-Options",
+                        "value": "DENY"
+                    },
+                    {
+                        "key": "X-XSS-Protection",
+                        "value": "1; mode=block"
+                    },
+                    {
+                        "key": "Referrer-Policy",
+                        "value": "strict-origin-when-cross-origin"
+                    },
+                    {
+                        "key": "Permissions-Policy",
+                        "value": "geolocation=(), microphone=(), camera=()"
+                    }
+                ]
+            },
+            {
+                "source": "/assets/**",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=31536000, immutable"
+                    }
+                ]
+            },
+            {
+                "source": "**/*.@(jpg|jpeg|gif|png|webp|avif|svg)",
+                "headers": [
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=604800"
+                    }
+                ]
+            },
+            {
                 "source": "/sitemap.xml",
                 "headers": [
                     {
                         "key": "Content-Type",
                         "value": "application/xml"
+                    },
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=86400"
                     }
                 ]
             },
@@ -28,6 +75,10 @@
                     {
                         "key": "Content-Type",
                         "value": "text/plain"
+                    },
+                    {
+                        "key": "Cache-Control",
+                        "value": "public, max-age=86400"
                     }
                 ]
             }

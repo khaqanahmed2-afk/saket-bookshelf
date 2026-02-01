@@ -78,25 +78,25 @@ export default function Admin() {
               </Card>
             </div>
 
-            {/* Legacy Tally Import Card (Faded) */}
-            <div className="group relative opacity-70 hover:opacity-100 transition-opacity">
-              <Card className="relative h-full border-slate-100 bg-white rounded-[2rem] shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+            {/* Data Import Card */}
+            <div className="group relative">
+              <Card className="relative h-full border-primary/10 bg-white rounded-[2rem] shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group-hover:-translate-y-1">
                 <CardHeader className="p-8 pb-4">
-                  <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center mb-6 text-slate-400 group-hover:scale-110 transition-transform duration-300">
+                  <div className="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 text-purple-600 group-hover:scale-110 transition-transform duration-300">
                     <Upload className="w-7 h-7" />
                   </div>
-                  <CardTitle className="text-2xl font-bold text-slate-700">Legacy Tally Import</CardTitle>
+                  <CardTitle className="text-2xl font-bold text-slate-800">Data Import</CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 pt-2">
-                  <p className="text-slate-400 mb-8 leading-relaxed">
-                    Classic XML-based import for Tally Masters and Vouchers. Use this for specific accounting archival needs.
+                  <p className="text-slate-500 mb-8 leading-relaxed">
+                    Upload XML files for Customers, Bills, and Payments. Strict order enforcement with duplicate protection.
                   </p>
 
-                  <div className="opacity-50 pointer-events-none">
-                    <ShinyButton variant="secondary" className="w-full bg-slate-100 text-slate-400 border-transparent rounded-xl py-6">
-                      Coming Soon
+                  <Link href="/admin/data-import">
+                    <ShinyButton className="w-full bg-purple-500 text-white hover:bg-purple-600 shadow-purple-200 group-hover:translate-x-1 transition-all rounded-xl py-6">
+                      Import Data <ArrowRight className="w-4 h-4 ml-2" />
                     </ShinyButton>
-                  </div>
+                  </Link>
                 </CardContent>
               </Card>
             </div>

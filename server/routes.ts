@@ -79,6 +79,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/import/sync/:id", requireAdmin, vyaparController.syncImport);
   app.get("/api/import/history", requireAdmin, vyaparController.getRecentImports);
 
+  // XML Upload Routes (Strict Order: Customers → Bills → Payments)
+  const xmlUploadRouter = await import("./routes/xml-upload");
+  app.use("/api/admin/upload", xmlUploadRouter.default);
+
   // Temporary Schema Fix Endpoint (can be removed after running once)
   const schemaController = await import("./controllers/fix-schema");
   app.post("/api/admin/fix-products-schema", requireAdmin, schemaController.fixProductsSchema);

@@ -1,6 +1,11 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { config } from "dotenv";
+import path from "path";
+
+// Load .env.production file
+config({ path: path.resolve(process.cwd(), ".env.production") });
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -35,8 +40,19 @@ const allowlist = [
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
 
-  console.log("building client...");
-  await viteBuild();
+  // Set production environment variables for Vite build
+  process.env.NODE_ENV = "production";
+  // VITE_API_URL should be loaded from .env.production via dotenv above
+  if (!process.env.VITE_API_URL) {
+    process.env.VITE_API_URL = "https://saket-bookshelf-1.onrender.com";
+  }
+
+  console.log("🔧 Building with environment:");
+  console.log("   VITE_API_URL:", process.env.VITE_API_URL);
+  console.log("   NODE_ENV:", process.env.NODE_ENV);
+
+  console.log("\nbuilding client...");
+  await viteBuild({ mode: "production" });
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
