@@ -45,9 +45,14 @@
     --font-display: 'Quicksand', sans-serif;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
+    overflow-x: hidden;
   }
 
   ::selection {

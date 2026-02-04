@@ -7,6 +7,9 @@ import { requireAuth, requireAdmin } from "./middleware/auth";
 import * as authController from "./controllers/auth";
 import * as dashboardController from "./controllers/dashboard";
 import * as adminController from "./controllers/admin";
+import * as settlementController from "./controllers/settlements";
+import * as mobileRegController from "./controllers/mobile-registration";
+import * as mobileVerificationController from "./controllers/mobile-verification";
 import { supabase } from "./services/supabase";
 
 import fs from "fs";
@@ -64,8 +67,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get(api.auth.me.path, authController.me);
   app.post(api.auth.logout.path, authController.logout);
 
+  // Mobile Registration (Shop Search & Request)
+  app.get("/api/auth/search-shops", mobileRegController.searchShops);
+  app.post("/api/auth/request-mobile-link", mobileRegController.requestMobileLink);
+
+  // Mobile Verification System Routes
+  app.get("/api/mobile/verification-status", requireAuth, mobileVerificationController.checkMobileVerificationStatus);
+  app.post("/api/mobile/add", requireAuth, mobileVerificationController.addMobileNumber);
+  
+  // Admin Mobile Verification Portal
+  app.get("/api/admin/mobile-verifications", requireAdmin, mobileVerificationController.getPendingVerifications);
+  app.post("/api/admin/mobile-verifications/verify", requireAdmin, mobileVerificationController.verifyMobileNumber);
+  app.post("/api/admin/mobile-verifications/reject", requireAdmin, mobileVerificationController.rejectMobileVerification);
+
+  // Admin approval routes - require admin authentication
+  // Note: For WhatsApp link access, admin must be logged in first, or implement signed tokens
+  app.get("/api/admin/approve-mobile", requireAdmin, mobileRegController.approveMobileRegistration);
+  app.get("/api/admin/reject-mobile", requireAdmin, mobileRegController.rejectMobileRegistration);
+
   // User Dashboard
   app.get("/api/dashboard", requireAuth, dashboardController.getDashboardData);
+
+  // Settlement Routes
+  app.post("/api/admin/settle", requireAdmin, settlementController.settleInvoice);
 
   // Admin Routes
   app.post(api.admin.uploadTally.path, requireAdmin, upload.single("file"), adminController.uploadTally);
@@ -78,6 +102,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/import/status/:id", requireAdmin, vyaparController.getImportStatus);
   app.post("/api/import/sync/:id", requireAdmin, vyaparController.syncImport);
   app.get("/api/import/history", requireAdmin, vyaparController.getRecentImports);
+
+  // Tally Excel Import Routes (Party Report & Sales Report)
+  const tallyExcelController = await import("./controllers/tally-excel-import");
+
+  app.post("/api/tally/import-party", requireAdmin, upload.single("file"), tallyExcelController.uploadPartyExcel);
+  app.post("/api/tally/import-sales", requireAdmin, upload.single("file"), tallyExcelController.uploadSalesExcel);
+  app.get("/api/tally/import-logs", requireAdmin, tallyExcelController.getImportLogs);
 
   // XML Upload Routes (Strict Order: Customers → Bills → Payments)
   const xmlUploadRouter = await import("./routes/xml-upload");

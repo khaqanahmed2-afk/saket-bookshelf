@@ -16,7 +16,7 @@ export function useAuth() {
         const data = await api.auth.me();
         setUser(data.user || null);
       } catch (error) {
-        console.error("Session check failed:", error);
+        if (import.meta.env.DEV) console.error("Session check failed:", error);
         setUser(null);
       } finally {
         setLoading(false);
@@ -28,9 +28,9 @@ export function useAuth() {
   const checkMobile = async (mobile: string) => {
     try {
       const data = await api.auth.checkMobile(mobile);
-      return data.exists;
+      return data; // Return full object { exists, verified, message }
     } catch {
-      return false;
+      return { exists: false };
     }
   };
 
@@ -94,7 +94,7 @@ export function useAuth() {
     try {
       await api.auth.logout();
     } catch (error) {
-      console.error("Logout error:", error);
+      if (import.meta.env.DEV) console.error("Logout error:", error);
     } finally {
       setUser(null);
       setLocation("/");

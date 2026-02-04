@@ -6,7 +6,7 @@ import { StatCard } from "@/components/StatCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useLocation } from "wouter";
-import { Wallet, ShoppingCart, Receipt, Calendar, Lock, LogOut, FileText, Download, TrendingUp, TrendingDown, ArrowUpRight, Search, Filter } from "lucide-react";
+import { Wallet, ShoppingCart, Receipt, Calendar, Lock, LogOut, FileText, Download, TrendingUp, TrendingDown, ArrowUpRight, Search, Filter, Upload } from "lucide-react";
 import { format, subMonths, startOfYear, endOfYear, isWithinInterval, parseISO } from "date-fns";
 import { DashboardCharts } from "@/components/DashboardCharts";
 import { LedgerTable } from "@/components/LedgerTable";
@@ -15,6 +15,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { AccountInfoCard } from "@/components/dashboard/AccountInfoCard";
 import { generatePDFStatement, generateExcelStatement } from "@/utils/statement-generator";
 import { ShinyButton } from "@/components/ui/shiny-button";
+import { SmartUpload } from "@/components/SmartUpload";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,94 +25,35 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SettleInvoiceModal } from "@/components/SettleInvoiceModal";
+import { MobileVerificationBanner } from "@/components/MobileVerificationBanner";
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
   const [, setLocation] = useLocation();
-  const { customer, ledger, bills, invoices, payments, summary, monthly, isLoading } = useDashboardData();
-
-  const [viewMode, setViewMode] = useState<"monthly" | "yearly">("yearly"); // Default to yearly for broader view
+  const [viewMode, setViewMode] = useState<"monthly" | "yearly" | "all">("all"); // Default to "all" to show all invoices
+  const { customer, ledger, invoices, payments, summary, monthly, isLoading, refetch } = useDashboardData({ period: viewMode });
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
 
-  // Calculate Balances & Filter Data based on View Mode
-  const filteredData = useMemo(() => {
-    const now = new Date();
-    let startDate = startOfYear(now);
-    let endDate = endOfYear(now);
-
-    if (viewMode === "monthly") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    }
-
-    // fallback if ledger not available, use invoices/payments directly
-    const hasLedger = ledger && ledger.length > 0;
-
-    if (!hasLedger) {
-      // Fallback Calculation from Invoices/Payments
-      const validInvoices = (invoices || []).filter((inv: any) => {
-        const d = new Date(inv.date || inv.billDate || inv.bill_date);
-        return isWithinInterval(d, { start: startDate, end: endDate });
-      });
-      const validPayments = (payments || []).filter((pay: any) => {
-        const d = new Date(pay.paymentDate || pay.payment_date);
-        return isWithinInterval(d, { start: startDate, end: endDate });
-      });
-
-      const purchases = validInvoices.reduce((sum: number, inv: any) => sum + Number(inv.totalAmount || inv.total_amount || inv.amount || 0), 0);
-      const paid = validPayments.reduce((sum: number, pay: any) => sum + Number(pay.amount || 0), 0);
-
-      return {
-        ledger: [],
-        purchases,
-        paid,
-        opening: 0,
-        closing: purchases - paid // simplified implies starting from 0 if no ledger
-      };
-    }
-
-    // Main Ledger Calculation
-    const filteredLedger = ledger.filter((item: any) => {
-      const date = new Date(item.entryDate);
-      return isWithinInterval(date, { start: startDate, end: endDate });
-    });
-
-    // Opening Balance
-    const lastPrevEntry = ledger.find((item: any) => new Date(item.entryDate) < startDate);
-    const openingBalance = lastPrevEntry ? Number(lastPrevEntry.balance) : 0;
-
-    const purchases = filteredLedger.reduce((sum: number, item: any) => sum + Number(item.debit || 0), 0);
-    const paid = filteredLedger.reduce((sum: number, item: any) => sum + Number(item.credit || 0), 0);
-
-    // Closing Balance Calculation (Strict Formula)
-    const closingBalance = openingBalance + purchases - paid;
-
-    return {
-      ledger: filteredLedger,
-      purchases,
-      paid,
-      opening: openingBalance,
-      closing: closingBalance
-    };
-  }, [ledger, invoices, payments, viewMode]);
-
-  // Invoice / Bill Merging Logic
+  // Filter Invoices Logic
   const displayInvoices = useMemo(() => {
-    // Prefer 'invoices' table, allow search
-    let data = (invoices && invoices.length > 0) ? invoices : (bills || []);
+    let data = invoices || [];
 
     // Filter
     if (invoiceSearch) {
       const term = invoiceSearch.trim().toLowerCase();
       data = data.filter((inv: any) => {
-        // Safe Access: check all possible key variations
-        const invNo = String(inv.invoiceNo ?? inv.invoice_no ?? inv.billNo ?? inv.bill_no ?? "").toLowerCase();
-        const amt = String(inv.amount ?? inv.totalAmount ?? inv.total_amount ?? 0);
+        const invNo = String(inv.invoiceNo || "").toLowerCase();
+        const amt = String(inv.totalAmount || inv.amount || 0);
 
         return invNo.includes(term) || amt.includes(term);
       });
     }
     return data;
-  }, [invoices, bills, invoiceSearch]);
+  }, [invoices, invoiceSearch]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -137,6 +80,10 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="bg-secondary/30 min-h-screen pb-20 overflow-x-hidden">
+        {/* Mobile Verification Banner */}
+        <div className="container mx-auto px-4 pt-6">
+          <MobileVerificationBanner />
+        </div>
 
         {/* Top Header & Account Info - PASTEL THEME */}
         <div className="bg-gradient-to-r from-primary/10 via-secondary to-accent/10 pt-10 pb-20 px-4 border-b border-primary/5">
@@ -149,21 +96,42 @@ export default function Dashboard() {
                 <p className="text-slate-500 font-medium">Here is your financial overview.</p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+                <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+                  <DialogTrigger asChild>
+                    <ShinyButton className="w-full sm:w-auto min-h-[44px] bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20">
+                      <Upload className="w-4 h-4 mr-2" /> Smart Import
+                    </ShinyButton>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl p-0 overflow-hidden border-none bg-transparent shadow-none">
+                    <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
+                      <div className="p-6 border-b bg-slate-50/50">
+                        <DialogTitle className="text-xl font-bold text-slate-800">Smart Data Import</DialogTitle>
+                        <DialogDescription>
+                          Upload any Excel file. We'll verify it, create backups, and update your ledger automatically.
+                        </DialogDescription>
+                      </div>
+                      <div className="p-6">
+                        <SmartUpload onComplete={() => { refetch(); setTimeout(() => setIsImportOpen(false), 2000); }} />
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <ShinyButton onClick={() => generatePDFStatement({
                   customer,
-                  ledger: filteredData.ledger,
-                  openingBalance: filteredData.opening,
-                  closingBalance: filteredData.closing
-                })} className="bg-white border-primary/20 text-slate-700 hover:bg-primary/5 shadow-sm">
+                  ledger: ledger,
+                  openingBalance: summary.openingBalance,
+                  closingBalance: summary.currentBalance
+                })} className="w-full sm:w-auto min-h-[44px] bg-white border-primary/20 text-slate-700 hover:bg-primary/5 shadow-sm">
                   <Download className="w-4 h-4 mr-2 text-primary" /> Statement (PDF)
                 </ShinyButton>
                 <ShinyButton onClick={() => generateExcelStatement({
                   customer,
-                  ledger: filteredData.ledger,
-                  openingBalance: filteredData.opening,
-                  closingBalance: filteredData.closing
-                })} className="bg-white border-primary/20 text-slate-700 hover:bg-primary/5 shadow-sm">
+                  ledger: ledger,
+                  openingBalance: summary.openingBalance,
+                  closingBalance: summary.currentBalance
+                })} className="w-full sm:w-auto min-h-[44px] bg-white border-primary/20 text-slate-700 hover:bg-primary/5 shadow-sm">
                   <FileText className="w-4 h-4 mr-2 text-green-600" /> Excel
                 </ShinyButton>
               </div>
@@ -199,6 +167,12 @@ export default function Dashboard() {
               <div className="flex justify-end">
                 <div className="bg-white p-1 rounded-2xl shadow-sm border border-primary/10 inline-flex">
                   <button
+                    onClick={() => setViewMode("all")}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'all' ? 'bg-primary text-white shadow-md shadow-primary/20' : 'text-slate-500 hover:bg-secondary'}`}
+                  >
+                    All Time
+                  </button>
+                  <button
                     onClick={() => setViewMode("monthly")}
                     className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${viewMode === 'monthly' ? 'bg-primary text-white shadow-md shadow-primary/20' : 'text-slate-500 hover:bg-secondary'}`}
                   >
@@ -217,30 +191,30 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <StatCard
                   title="Opening Balance"
-                  value={`₹${filteredData.opening.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                  value={`₹${summary.openingBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                   icon={Calendar}
                   color="slate"
                   delay={0}
                 />
                 <StatCard
                   title="Total Purchase"
-                  value={`₹${filteredData.purchases.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                  value={`₹${summary.totalPurchases.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                   icon={TrendingUp}
                   color="orange"
                   delay={100}
                 />
                 <StatCard
                   title="Total Paid"
-                  value={`₹${filteredData.paid.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                  value={`₹${summary.totalPaid.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                   icon={TrendingDown}
                   color="teal"
                   delay={200}
                 />
                 <StatCard
                   title="Closing Balance"
-                  value={`₹${filteredData.closing.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                  value={`₹${summary.currentBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                   icon={Wallet}
-                  color={filteredData.closing > 0 ? 'red' : 'green'}
+                  color={summary.currentBalance > 0 ? 'red' : 'green'}
                   delay={300}
                 />
               </div>
@@ -274,18 +248,18 @@ export default function Dashboard() {
                 <TabsContent value="invoices" className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {displayInvoices.map((inv: any, idx: number) => {
-                      // Fix: Handle mismatched keys (snake_case vs camelCase) safely
-                      const amount = Number(inv.amount || inv.totalAmount || inv.total_amount || 0);
-                      const date = inv.date || inv.billDate || inv.bill_date;
-                      // Fallback: invoiceNo (frontend) -> invoice_no (db) -> billNo (frontend) -> bill_no (db)
-                      const number = inv.invoiceNo || inv.invoice_no || inv.billNo || inv.bill_no || "N/A";
-                      const status = inv.status || ((idx === 0 && summary.currentBalance > 0) ? 'pending' : 'paid'); // Dummy status logic fallback
+                      const amount = Number(inv.totalAmount || 0);
+                      const paid = Number(inv.paidAmount || 0);
+                      const due = Number(inv.dueAmount || 0);
+                      const date = inv.date;
+                      const number = inv.invoiceNo || "N/A";
+                      const status = inv.status;
 
                       return (
-                        <Card key={idx} className="border-primary/5 shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all group cursor-pointer bg-white rounded-[1.5rem] overflow-hidden">
+                        <Card key={idx} className="border-primary/5 shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all group bg-white rounded-[1.5rem] overflow-hidden">
                           <CardContent className="p-5 flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                              <div className={`p-3 rounded-2xl ${status === 'pending' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
+                              <div className={`p-3 rounded-2xl ${status === 'unpaid' ? 'bg-red-50 text-red-500' : (status === 'partial' ? 'bg-orange-50 text-orange-500' : 'bg-green-50 text-green-600')}`}>
                                 <FileText className="w-6 h-6" />
                               </div>
                               <div>
@@ -293,11 +267,30 @@ export default function Dashboard() {
                                 <p className="text-sm text-slate-500">{format(new Date(date), 'dd MMM yyyy')}</p>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-bold text-lg text-slate-800">₹{amount.toLocaleString()}</p>
-                              <Badge variant={status === 'paid' ? 'default' : 'destructive'} className="capitalize mt-1 rounded-lg">
-                                {status || 'Unknown'}
-                              </Badge>
+                            <div className="flex items-center gap-6">
+                              <div className="text-right">
+                                <p className="font-bold text-lg text-slate-800">₹{amount.toLocaleString()}</p>
+                                <div className="flex flex-col items-end gap-1 mt-1">
+                                  <Badge variant={status === 'paid' ? 'default' : (status === 'partial' ? 'outline' : 'destructive')} className="capitalize rounded-lg px-2 py-0.5">
+                                    {status}
+                                  </Badge>
+                                  {status !== 'paid' && (
+                                    <p className="text-[10px] font-bold text-slate-400">
+                                      Due: ₹{due.toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {status !== 'paid' && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="rounded-xl h-10 px-4 font-bold bg-primary/5 text-primary hover:bg-primary hover:text-white transition-all shadow-none border-none"
+                                  onClick={() => setSelectedInvoice(inv)}
+                                >
+                                  Settle
+                                </Button>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -315,7 +308,7 @@ export default function Dashboard() {
                   <Card className="border-none shadow-sm rounded-[2rem] overflow-hidden bg-white">
                     <CardContent className="p-0">
                       <div className="divide-y divide-primary/5">
-                        {payments?.map((payment: any) => (
+                        {Array.isArray(payments) && payments.map((payment: any) => (
                           <div key={payment.id} className="flex items-center justify-between p-6 hover:bg-secondary/30 transition-colors">
                             <div className="flex items-center gap-4">
                               <div className="bg-primary/10 p-3 rounded-2xl text-primary">
@@ -348,6 +341,12 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <SettleInvoiceModal
+          isOpen={!!selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          invoice={selectedInvoice}
+        />
       </div>
     </Layout>
   );

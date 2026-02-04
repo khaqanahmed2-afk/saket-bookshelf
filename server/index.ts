@@ -60,7 +60,9 @@ if (!sessionSecret || sessionSecret.length < 32) {
 }
 
 
-// Session configuration with cross-domain cookie support
+// Session configuration with environment-aware cookie settings
+const isProduction = process.env.NODE_ENV === "production";
+
 app.use(
   session({
     secret: sessionSecret,
@@ -69,10 +71,10 @@ app.use(
     store,
     name: "saket.sid",
     cookie: {
-      secure: true, // Required for sameSite: "none"
+      secure: isProduction, // false for localhost (HTTP), true for production (HTTPS)
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: "none", // Required for cross-domain (frontend on different domain)
+      sameSite: isProduction ? "none" : "lax", // "lax" for localhost, "none" for cross-domain
     },
   }),
 );
@@ -92,6 +94,7 @@ declare module "express-session" {
       mobile: string;
       id: string;
       role?: string;
+      mobileVerified?: boolean;
     };
   }
 }

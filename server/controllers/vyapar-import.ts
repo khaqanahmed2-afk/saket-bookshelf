@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../db";
 import { stagingImports } from "@shared/schema";
-import { parseFile, processStagingImport } from "../services/import-service";
+import { parseFile, processStagingImport, detectFileType } from "../services/import-service";
 import { eq, desc } from "drizzle-orm";
 import fs from "fs";
 
@@ -32,11 +32,28 @@ export async function uploadVyapar(req: MulterRequest, res: Response) {
             return res.status(400).json({ message: "File is empty or could not be parsed." });
         }
 
+        // 2.5 Auto-Detect Type from Headers
+        let detectedType: string | null = null;
+        if (rawData.length > 0) {
+            const headers = Object.keys((rawData as any[])[0]);
+            const detected = detectFileType(headers);
+            if (detected) {
+                detectedType = detected;
+                console.log(`Smart Import: Auto-detected file type as '${detected}' (Overriding user selection '${type}')`);
+            }
+        }
+
+        const finalType = detectedType || type;
+
+        if (!["customers", "products", "invoices"].includes(finalType)) {
+            return res.status(400).json({ message: `Invalid import type '${finalType}'. Must be customers, products, or invoices.` });
+        }
+
         // 3. Save to Staging
         const [stagingRecord] = await db.insert(stagingImports).values({
             filename: req.file.originalname,
             source: "vyapar",
-            type: type,
+            type: finalType,
             status: "pending",
             // rawData is text or jsonb in schema. If jsonb, we pass object. If text, stringify.
             // We set it to jsonb in schema.ts

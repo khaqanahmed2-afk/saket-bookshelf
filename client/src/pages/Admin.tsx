@@ -1,7 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ShinyButton } from "@/components/ui/shiny-button";
-import { Upload, ArrowRight, FileSpreadsheet, Package } from "lucide-react";
+import { Upload, ArrowRight, FileSpreadsheet, Package, Phone } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect, Link } from "wouter";
 import { motion } from "framer-motion";
@@ -30,7 +30,7 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8"
+            className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
           >
             {/* Vyapar Sync Card */}
             <div className="group relative">
@@ -95,6 +95,29 @@ export default function Admin() {
                   <Link href="/admin/data-import">
                     <ShinyButton className="w-full bg-purple-500 text-white hover:bg-purple-600 shadow-purple-200 group-hover:translate-x-1 transition-all rounded-xl py-6">
                       Import Data <ArrowRight className="w-4 h-4 ml-2" />
+                    </ShinyButton>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Mobile Verification Card */}
+            <div className="group relative">
+              <Card className="relative h-full border-primary/10 bg-white rounded-[2rem] shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group-hover:-translate-y-1">
+                <CardHeader className="p-8 pb-4">
+                  <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center mb-6 text-orange-600 group-hover:scale-110 transition-transform duration-300">
+                    <Phone className="w-7 h-7" />
+                  </div>
+                  <CardTitle className="text-2xl font-bold text-slate-800">Mobile Verification</CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 pt-2">
+                  <p className="text-slate-500 mb-8 leading-relaxed">
+                    Review and verify mobile number linking requests from users. Approve or reject verification requests.
+                  </p>
+
+                  <Link href="/admin/mobile-verification">
+                    <ShinyButton className="w-full bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200 group-hover:translate-x-1 transition-all rounded-xl py-6">
+                      Verify Mobiles <ArrowRight className="w-4 h-4 ml-2" />
                     </ShinyButton>
                   </Link>
                 </CardContent>

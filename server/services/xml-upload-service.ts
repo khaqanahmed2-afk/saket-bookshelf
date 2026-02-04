@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { XMLParser } from 'fast-xml-parser';
 import { db } from '../db';
-import { uploadLogs, customers, bills, payments } from '@shared/schema';
+import { importLogs, customers, payments, invoices } from '@shared/schema';
 import { eq, and, or } from 'drizzle-orm';
 
 export interface UploadResult {
@@ -40,8 +40,8 @@ export class XMLUploadService {
      * Check if file with this hash has already been uploaded
      */
     async isDuplicateFile(hash: string): Promise<boolean> {
-        const existing = await db.query.uploadLogs.findFirst({
-            where: eq(uploadLogs.fileHash, hash),
+        const existing = await db.query.importLogs.findFirst({
+            where: eq(importLogs.fileHash, hash),
         });
         return !!existing;
     }
@@ -51,26 +51,26 @@ export class XMLUploadService {
      */
     async getUploadStatus(): Promise<UploadStatus> {
         const [customersLog, billsLog, paymentsLog] = await Promise.all([
-            db.query.uploadLogs.findFirst({
+            db.query.importLogs.findFirst({
                 where: and(
-                    eq(uploadLogs.uploadType, 'customers'),
-                    or(eq(uploadLogs.status, 'success'), eq(uploadLogs.status, 'partial'))
+                    eq(importLogs.importType, 'customers'),
+                    or(eq(importLogs.status, 'success'), eq(importLogs.status, 'partial'))
                 ),
-                orderBy: (logs, { desc }) => [desc(logs.uploadedAt)],
+                orderBy: (logs, { desc }) => [desc(logs.importedAt)],
             }),
-            db.query.uploadLogs.findFirst({
+            db.query.importLogs.findFirst({
                 where: and(
-                    eq(uploadLogs.uploadType, 'bills'),
-                    or(eq(uploadLogs.status, 'success'), eq(uploadLogs.status, 'partial'))
+                    eq(importLogs.importType, 'bills'),
+                    or(eq(importLogs.status, 'success'), eq(importLogs.status, 'partial'))
                 ),
-                orderBy: (logs, { desc }) => [desc(logs.uploadedAt)],
+                orderBy: (logs, { desc }) => [desc(logs.importedAt)],
             }),
-            db.query.uploadLogs.findFirst({
+            db.query.importLogs.findFirst({
                 where: and(
-                    eq(uploadLogs.uploadType, 'payments'),
-                    or(eq(uploadLogs.status, 'success'), eq(uploadLogs.status, 'partial'))
+                    eq(importLogs.importType, 'payments'),
+                    or(eq(importLogs.status, 'success'), eq(importLogs.status, 'partial'))
                 ),
-                orderBy: (logs, { desc }) => [desc(logs.uploadedAt)],
+                orderBy: (logs, { desc }) => [desc(logs.importedAt)],
             }),
         ]);
 
@@ -260,18 +260,22 @@ export class XMLUploadService {
         recordsFailed: number;
         recordsSkipped: number;
         errorLog: any[];
+        errorSummary?: string;
         status: 'success' | 'partial' | 'failed';
+        uploadedBy?: string;
     }) {
-        const [log] = await db.insert(uploadLogs).values({
+        const [log] = await db.insert(importLogs).values({
             fileName: logData.fileName,
             fileHash: logData.fileHash,
-            uploadType: logData.uploadType,
-            recordsTotal: String(logData.recordsTotal),
-            recordsSuccess: String(logData.recordsSuccess),
-            recordsFailed: String(logData.recordsFailed),
-            recordsSkipped: String(logData.recordsSkipped),
+            importType: logData.uploadType,
+            totalRows: String(logData.recordsTotal),
+            importedRows: String(logData.recordsSuccess),
+            skippedRows: String(logData.recordsSkipped),
+            errorRows: String(logData.recordsFailed),
             errorLog: logData.errorLog,
+            errorSummary: logData.errorSummary || (logData.recordsFailed > 0 ? `${logData.recordsFailed} records failed processing` : undefined),
             status: logData.status,
+            uploadedBy: logData.uploadedBy,
         }).returning();
 
         return log;

@@ -18,11 +18,14 @@ import VyaparSync from "@/pages/admin/VyaparSync";
 import ProductManagement from "@/pages/admin/ProductManagement";
 import ChangePin from "@/pages/ChangePin";
 import DataImport from "@/pages/admin/DataImport";
+import MobileVerification from "@/pages/admin/MobileVerification";
+import BulkOrders from "@/pages/BulkOrders";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/bulk-orders" component={BulkOrders} />
       <Route path="/shop" component={Shop} />
       <Route path="/login" component={Login} />
       <Route path="/dashboard" component={Dashboard} />
@@ -33,6 +36,7 @@ function Router() {
       <Route path="/admin/products" component={ProductManagement} />
       <Route path="/admin/vyapar-sync" component={VyaparSync} />
       <Route path="/admin/data-import" component={DataImport} />
+      <Route path="/admin/mobile-verification" component={MobileVerification} />
       <Route path="/change-pin" component={ChangePin} />
       <Route component={NotFound} />
     </Switch>

@@ -59,9 +59,18 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 export const api = {
     auth: {
         checkMobile: (mobile: string) =>
-            fetchJson<{ exists: boolean }>(apiContract.auth.checkMobile.path, {
+            fetchJson<{ exists: boolean, verified?: boolean, message?: string }>(apiContract.auth.checkMobile.path, {
                 method: "POST",
                 body: JSON.stringify({ mobile }),
+            }),
+
+        searchShops: (query: string) =>
+            fetchJson<any[]>(`/api/auth/search-shops?q=${encodeURIComponent(query)}`),
+
+        requestMobileLink: (data: { customerId: string, mobile: string }) =>
+            fetchJson<{ success: boolean, message: string }>("/api/auth/request-mobile-link", {
+                method: "POST",
+                body: JSON.stringify(data),
             }),
 
         setupPin: (mobile: string, pin: string) =>
@@ -90,7 +99,10 @@ export const api = {
     },
 
     dashboard: {
-        getData: () => fetchJson<any>("/api/dashboard"),
+        getData: (params?: Record<string, any>) => {
+            const query = params ? '?' + new URLSearchParams(params as any).toString() : '';
+            return fetchJson<any>(`/api/dashboard${query}`);
+        },
     },
 
     admin: {
@@ -111,6 +123,40 @@ export const api = {
                     throw new Error(error.message || "Upload failed");
                 }
                 return res.json() as Promise<TallyUploadResponse>;
+            });
+        },
+
+        uploadVyapar: (file: File, type: string = "invoices") => {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("type", type);
+
+            const baseUrl = import.meta.env.VITE_API_URL || "";
+            const fullUrl = `${baseUrl}/api/import/upload`;
+
+            return fetch(fullUrl, {
+                method: "POST",
+                body: formData,
+                credentials: "include",
+            }).then(async (res) => {
+                if (!res.ok) {
+                    const error = await res.json().catch(() => ({ message: "Upload failed" }));
+                    throw new Error(error.message || "Upload failed");
+                }
+                return res.json();
+            });
+        },
+
+        syncImport: (id: string) => {
+            const baseUrl = import.meta.env.VITE_API_URL || "";
+            // Using helper directly if path allows, assuming fetchJson handles full url if provided or relative
+            // The fetchJson helper defined in this file handles standard relative paths.
+            // But here we are constructing fullUrl manually in other methods? 
+            // fetchJson adds baseUrl if not starting with http.
+            // So we can just pass partial path if we want, or full.
+            // Let's use relative path for fetchJson to be consistent.
+            return fetchJson<any>(`/api/import/sync/${id}`, {
+                method: "POST"
             });
         },
     },

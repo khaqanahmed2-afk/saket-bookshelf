@@ -8,11 +8,27 @@ export async function checkMobile(req: Request, res: Response) {
         const { mobile } = api.auth.checkMobile.input.parse(req.body);
         const { data: customer } = await supabase
             .from("customers")
-            .select("id, pin")
+            .select("id, pin, mobile_verified")
             .eq("mobile", mobile)
             .maybeSingle();
 
-        res.json({ exists: !!customer && !!customer.pin });
+        if (!customer) {
+            return res.json({ exists: false });
+        }
+
+        // If mobile exists but is a placeholder/unverified, tell frontend it needs registration
+        if (customer.mobile_verified === false) {
+            return res.json({
+                exists: true,
+                verified: false,
+                message: "Mobile not registered. Please register it."
+            });
+        }
+
+        res.json({
+            exists: !!customer.pin,
+            verified: true
+        });
     } catch (error) {
         res.json({ exists: false });
     }
@@ -72,13 +88,29 @@ export async function loginPin(req: Request, res: Response) {
             return res.status(401).json({ message: "Mobile not registered" });
         }
 
+        // Block login only if mobile is not verified
+        if (customer.mobile_verified !== true) {
+            return res.status(403).json({
+                message: "Your mobile number is not registered. Please register it.",
+                code: "MOBILE_UNVERIFIED"
+            });
+        }
+
         const valid = await bcrypt.compare(pin, customer.pin);
         if (!valid) return res.status(401).json({ message: "Incorrect PIN" });
 
-        req.session.user = { mobile, id: customer.id, role: customer.role || "user" };
+        req.session.user = {
+            mobile,
+            id: customer.id,
+            role: customer.role || "user",
+            mobileVerified: true
+        };
         await new Promise<void>((r) => req.session.save(() => r()));
 
-        res.json({ success: true, session: req.session.user });
+        res.json({
+            success: true,
+            session: req.session.user
+        });
     } catch (error: any) {
         res.status(401).json({ message: error.message });
     }

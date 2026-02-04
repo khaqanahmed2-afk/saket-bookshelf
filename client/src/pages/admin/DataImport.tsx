@@ -50,7 +50,7 @@ export default function DataImport() {
                 setUploadStatus(data);
             }
         } catch (error) {
-            console.error('Failed to fetch upload status:', error);
+            if (import.meta.env.DEV) console.error('Failed to fetch upload status:', error);
         } finally {
             setLoading(false);
         }
@@ -255,7 +255,7 @@ function XMLUploader({
                 window.URL.revokeObjectURL(url);
             }
         } catch (err) {
-            console.error('Failed to download errors:', err);
+            if (import.meta.env.DEV) console.error('Failed to download errors:', err);
         }
     };
 

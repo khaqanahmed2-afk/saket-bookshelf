@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { xmlUploadService } from '../services/xml-upload-service';
 import { db } from '../db';
-import { customers, bills, payments, uploadLogs } from '@shared/schema';
+import { customers, payments, importLogs, invoices } from '@shared/schema';
 import { eq, and, or } from 'drizzle-orm';
 import { requireAdmin } from '../middleware/auth';
 
@@ -75,61 +75,69 @@ router.post('/customers', requireAdmin, upload.single('file'), async (req: Reque
             return res.status(400).json({ error: 'No customer records found in XML' });
         }
 
-        // Process each customer
+        // Process each customer in chunks for performance
+        const CHUNK_SIZE = 500;
         let inserted = 0;
         let skipped = 0;
         let failed = 0;
         const errors: any[] = [];
 
-        for (let i = 0; i < customerRecords.length; i++) {
-            const customer = customerRecords[i];
+        for (let i = 0; i < customerRecords.length; i += CHUNK_SIZE) {
+            const chunk = customerRecords.slice(i, i + CHUNK_SIZE);
 
-            try {
-                // Check for duplicate by customer_code or name+mobile
-                const existing = customer.customerCode
-                    ? await db.query.customers.findFirst({
-                        where: eq(customers.customerCode, customer.customerCode),
-                    })
-                    : await db.query.customers.findFirst({
-                        where: and(
-                            eq(customers.name, customer.name),
-                            eq(customers.mobile, customer.mobile)
-                        ),
-                    });
+            await db.transaction(async (tx) => {
+                for (let j = 0; j < chunk.length; j++) {
+                    const customer = chunk[j];
+                    const rowIndex = i + j + 1;
 
-                if (existing) {
-                    skipped++;
-                    continue;
+                    try {
+                        // Check for duplicate by customer_code or name+mobile
+                        const existing = customer.customerCode
+                            ? await tx.query.customers.findFirst({
+                                where: eq(customers.customerCode, customer.customerCode),
+                            })
+                            : await tx.query.customers.findFirst({
+                                where: and(
+                                    eq(customers.name, customer.name),
+                                    eq(customers.mobile, customer.mobile)
+                                ),
+                            });
+
+                        if (existing) {
+                            skipped++;
+                            continue;
+                        }
+
+                        // Validate mobile number
+                        if (!customer.mobile || customer.mobile.length < 10) {
+                            errors.push({
+                                row: rowIndex,
+                                field: 'mobile',
+                                reason: 'Invalid or missing mobile number'
+                            });
+                            failed++;
+                            continue;
+                        }
+
+                        // Insert customer
+                        await tx.insert(customers).values({
+                            name: customer.name,
+                            mobile: customer.mobile,
+                            customerCode: customer.customerCode,
+                            source: customer.source,
+                            role: 'user',
+                        });
+
+                        inserted++;
+                    } catch (error: any) {
+                        errors.push({
+                            row: rowIndex,
+                            reason: error.message || 'Database error'
+                        });
+                        failed++;
+                    }
                 }
-
-                // Validate mobile number
-                if (!customer.mobile || customer.mobile.length < 10) {
-                    errors.push({
-                        row: i + 1,
-                        field: 'mobile',
-                        reason: 'Invalid or missing mobile number'
-                    });
-                    failed++;
-                    continue;
-                }
-
-                // Insert customer
-                await db.insert(customers).values({
-                    name: customer.name,
-                    mobile: customer.mobile,
-                    customerCode: customer.customerCode,
-                    source: customer.source,
-                    role: 'user',
-                });
-
-                inserted++;
-            } catch (error: any) {
-                errors.push({
-                    row: i + 1,
-                    reason: error.message || 'Database error'
-                });
-                failed++;
-            }
+            });
         }
 
         // Determine status
@@ -208,67 +216,79 @@ router.post('/bills', requireAdmin, upload.single('file'), async (req: Request, 
             return res.status(400).json({ error: 'No bill records found in XML' });
         }
 
-        // Process each bill
+        // Process each bill in chunks
+        const CHUNK_SIZE = 500;
         let inserted = 0;
         let skipped = 0;
         let failed = 0;
         const errors: any[] = [];
 
-        for (let i = 0; i < billRecords.length; i++) {
-            const bill = billRecords[i];
+        for (let i = 0; i < billRecords.length; i += CHUNK_SIZE) {
+            const chunk = billRecords.slice(i, i + CHUNK_SIZE);
 
-            try {
-                // Check for duplicate by bill_no + bill_date
-                const existing = await db.query.bills.findFirst({
-                    where: and(
-                        eq(bills.billNo, bill.billNo),
-                        eq(bills.billDate, bill.billDate)
-                    ),
-                });
+            await db.transaction(async (tx) => {
+                for (let j = 0; j < chunk.length; j++) {
+                    const bill = chunk[j];
+                    const rowIndex = i + j + 1;
 
-                if (existing) {
-                    skipped++;
-                    continue;
+                    try {
+                        // 1. Find customer first
+                        let customer;
+                        if (bill.customerCode) {
+                            customer = await tx.query.customers.findFirst({
+                                where: eq(customers.customerCode, bill.customerCode),
+                            });
+                        } else if (bill.customerName) {
+                            customer = await tx.query.customers.findFirst({
+                                where: eq(customers.name, bill.customerName),
+                            });
+                        }
+
+                        if (!customer) {
+                            errors.push({
+                                row: rowIndex,
+                                field: 'customer',
+                                reason: `Customer not found: ${bill.customerCode || bill.customerName}`
+                            });
+                            failed++;
+                            continue;
+                        }
+
+                        // 2. Check for duplicate invoice (Bill No + Customer ID)
+                        // Use UPSERT logic via ON CONFLICT if possible, but drizzle findFirst is safer for logging skipped
+                        const existing = await tx.query.invoices.findFirst({
+                            where: and(
+                                eq(invoices.invoiceNo, bill.billNo),
+                                eq(invoices.customerId, customer.id)
+                            ),
+                        });
+
+                        if (existing) {
+                            skipped++;
+                            continue;
+                        }
+
+                        // 3. Insert invoice
+                        await tx.insert(invoices).values({
+                            invoiceNo: bill.billNo,
+                            date: bill.billDate,
+                            totalAmount: bill.amount,
+                            customerId: customer.id,
+                            source: 'xml_upload',
+                            locked: true,
+                            status: 'paid'
+                        });
+
+                        inserted++;
+                    } catch (error: any) {
+                        errors.push({
+                            row: rowIndex,
+                            reason: error.message || 'Database error'
+                        });
+                        failed++;
+                    }
                 }
-
-                // Find customer
-                let customer;
-                if (bill.customerCode) {
-                    customer = await db.query.customers.findFirst({
-                        where: eq(customers.customerCode, bill.customerCode),
-                    });
-                } else if (bill.customerName) {
-                    customer = await db.query.customers.findFirst({
-                        where: eq(customers.name, bill.customerName),
-                    });
-                }
-
-                if (!customer) {
-                    errors.push({
-                        row: i + 1,
-                        field: 'customer',
-                        reason: `Customer not found: ${bill.customerCode || bill.customerName}`
-                    });
-                    failed++;
-                    continue;
-                }
-
-                // Insert bill
-                await db.insert(bills).values({
-                    billNo: bill.billNo,
-                    billDate: bill.billDate,
-                    amount: bill.amount,
-                    customerId: customer.id,
-                });
-
-                inserted++;
-            } catch (error: any) {
-                errors.push({
-                    row: i + 1,
-                    reason: error.message || 'Database error'
-                });
-                failed++;
-            }
+            });
         }
 
         // Determine status
@@ -347,63 +367,71 @@ router.post('/payments', requireAdmin, upload.single('file'), async (req: Reques
             return res.status(400).json({ error: 'No payment records found in XML' });
         }
 
-        // Process each payment
+        // Process each payment in chunks
+        const CHUNK_SIZE = 500;
         let inserted = 0;
         let skipped = 0;
         let failed = 0;
         const errors: any[] = [];
 
-        for (let i = 0; i < paymentRecords.length; i++) {
-            const payment = paymentRecords[i];
+        for (let i = 0; i < paymentRecords.length; i += CHUNK_SIZE) {
+            const chunk = paymentRecords.slice(i, i + CHUNK_SIZE);
 
-            try {
-                // Find bill
-                const bill = await db.query.bills.findFirst({
-                    where: eq(bills.billNo, payment.billNo),
-                });
+            await db.transaction(async (tx) => {
+                for (let j = 0; j < chunk.length; j++) {
+                    const payment = chunk[j];
+                    const rowIndex = i + j + 1;
 
-                if (!bill) {
-                    errors.push({
-                        row: i + 1,
-                        field: 'bill',
-                        reason: `Bill not found: ${payment.billNo}`
-                    });
-                    failed++;
-                    continue;
+                    try {
+                        // Find invoice (mapped from bill)
+                        const bill = await tx.query.invoices.findFirst({
+                            where: eq(invoices.invoiceNo, payment.billNo),
+                        });
+
+                        if (!bill) {
+                            errors.push({
+                                row: rowIndex,
+                                field: 'bill',
+                                reason: `Bill not found: ${payment.billNo}`
+                            });
+                            failed++;
+                            continue;
+                        }
+
+                        // Check for duplicate by receipt_no + invoice_id
+                        const existing = await tx.query.payments.findFirst({
+                            where: and(
+                                eq(payments.receiptNo, payment.receiptNo),
+                                eq(payments.invoiceId, bill.id)
+                            ),
+                        });
+
+                        if (existing) {
+                            skipped++;
+                            continue;
+                        }
+
+                        // Insert payment
+                        await tx.insert(payments).values({
+                            receiptNo: payment.receiptNo,
+                            invoiceId: bill.id,
+                            customerId: bill.customerId!,
+                            paymentDate: payment.paymentDate,
+                            amount: payment.amount,
+                            mode: payment.paymentMode || 'Cash',
+                            source: 'xml_upload',
+                        });
+
+                        inserted++;
+                    } catch (error: any) {
+                        errors.push({
+                            row: rowIndex,
+                            reason: error.message || 'Database error'
+                        });
+                        failed++;
+                    }
                 }
-
-                // Check for duplicate by receipt_no + bill_id
-                const existing = await db.query.payments.findFirst({
-                    where: and(
-                        eq(payments.receiptNo, payment.receiptNo),
-                        eq(payments.billId, bill.id)
-                    ),
-                });
-
-                if (existing) {
-                    skipped++;
-                    continue;
-                }
-
-                // Insert payment
-                await db.insert(payments).values({
-                    receiptNo: payment.receiptNo,
-                    billId: bill.id,
-                    customerId: bill.customerId!,
-                    paymentDate: payment.paymentDate,
-                    amount: payment.amount,
-                    mode: payment.paymentMode || 'Cash',
-                    source: 'xml_upload',
-                });
-
-                inserted++;
-            } catch (error: any) {
-                errors.push({
-                    row: i + 1,
-                    reason: error.message || 'Database error'
-                });
-                failed++;
-            }
+            });
         }
 
         // Determine status
@@ -448,8 +476,8 @@ router.get('/:uploadId/errors', requireAdmin, async (req: Request, res: Response
     try {
         const { uploadId } = req.params;
 
-        const uploadLog = await db.query.uploadLogs.findFirst({
-            where: eq(uploadLogs.id, uploadId),
+        const uploadLog = await db.query.importLogs.findFirst({
+            where: eq(importLogs.id, uploadId),
         });
 
         if (!uploadLog || !uploadLog.errorLog) {

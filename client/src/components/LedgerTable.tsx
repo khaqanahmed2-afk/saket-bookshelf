@@ -36,7 +36,7 @@ export function LedgerTable({ data }: LedgerProps) {
                     <button
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
-                        className="p-2 rounded-xl hover:bg-white transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl hover:bg-white transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                         <ChevronLeft className="h-5 w-5" />
                     </button>
@@ -44,7 +44,7 @@ export function LedgerTable({ data }: LedgerProps) {
                     <button
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
-                        className="p-2 rounded-xl hover:bg-white transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                        className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl hover:bg-white transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                         <ChevronRight className="h-5 w-5" />
                     </button>
@@ -89,7 +89,7 @@ export function LedgerTable({ data }: LedgerProps) {
                                                     {Number(entry.debit) > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className="font-bold text-slate-700">{entry.voucherNo || "General Entry"}</span>
+                                                    <span className="font-bold text-slate-700">{entry.referenceNo || "General Entry"}</span>
                                                     <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Transaction</span>
                                                 </div>
                                             </div>
@@ -135,7 +135,7 @@ export function LedgerTable({ data }: LedgerProps) {
                                         </div>
                                         <div>
                                             <p className="font-black text-slate-800">{format(new Date(entry.entryDate), 'dd MMM yyyy')}</p>
-                                            <p className="text-xs text-muted-foreground font-bold">{entry.voucherNo || "No Voucher"}</p>
+                                            <p className="text-xs text-muted-foreground font-bold">{entry.referenceNo || "No Reference"}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">

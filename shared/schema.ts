@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, bigint, uuid, date, numeric, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, bigint, uuid, date, numeric, boolean, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -18,66 +18,73 @@ export const importMeta = pgTable("import_meta", {
 export const customers = pgTable("customers", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  mobile: text("mobile").notNull().unique(),
+  mobile: text("mobile").notNull(),
   customerCode: text("customer_code"), // For XML imports - unique customer identifier
   pin: text("pin"),
   role: text("role", { enum: ["user", "admin"] }).default("user").notNull(),
+  email: text("email"),
+  address: text("address"),
+
+  // Tally Import Fields
+  openingBalance: numeric("opening_balance").default("0"),
+  balanceType: text("balance_type", { enum: ["receivable", "payable"] }).default("receivable"),
+  locked: boolean("locked").default(false),
+
   source: text("source").default("system"),
   externalId: text("external_id"),
+  mobileVerified: boolean("mobile_verified").default(false),
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const ledger = pgTable("ledger", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-  customerId: uuid("customer_id").references(() => customers.id),
-  entryDate: date("entry_date").notNull(),
-  debit: numeric("debit").notNull(),
-  credit: numeric("credit").notNull(),
-  balance: numeric("balance").notNull(),
-  voucherNo: text("voucher_no").unique(),
-});
+// Ledger table removed - using customer_ledger_view instead
 
-export const bills = pgTable("bills", {
-  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
-  customerId: uuid("customer_id").references(() => customers.id),
-  billNo: text("bill_no").notNull().unique(),
-  billDate: date("bill_date").notNull(),
-  amount: numeric("amount").notNull(),
-});
+// Bills table removed - merged into invoices
 
 export const payments = pgTable("payments", {
   id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
   customerId: uuid("customer_id").references(() => customers.id),
-  billId: bigint("bill_id", { mode: "number" }).references(() => bills.id), // Link to specific bill
+  invoiceId: uuid("invoice_id").references(() => invoices.id), // Unified reference to invoices
+  // billId reference removed
   receiptNo: text("receipt_no").notNull(), // Receipt/payment number from XML
   paymentDate: date("payment_date").notNull(),
   amount: numeric("amount").notNull(),
   mode: text("mode").notNull(),
   referenceNo: text("reference_no"),
   source: text("source").default("system"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    idxPaymentUnique: uniqueIndex("idx_payment_unique").on(table.receiptNo, table.customerId),
+  };
 });
 
-// XML Upload tracking table
-export const uploadLogs = pgTable("upload_logs", {
+// Import tracking table (for XML/Excel uploads)
+export const importLogs = pgTable("import_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   fileName: text("file_name").notNull(),
   fileHash: text("file_hash").notNull().unique(), // SHA-256 hash for duplicate detection
-  uploadType: text("upload_type", { enum: ["customers", "bills", "payments"] }).notNull(),
-  recordsTotal: numeric("records_total").notNull().default("0"),
-  recordsSuccess: numeric("records_success").notNull().default("0"),
-  recordsFailed: numeric("records_failed").notNull().default("0"),
-  recordsSkipped: numeric("records_skipped").notNull().default("0"),
+  importType: text("import_type", {
+    enum: ["customers", "bills", "payments", "party", "sales"]
+  }).notNull(),
+  // Tally/Standard Import Audit
+  totalRows: numeric("total_rows").notNull().default("0"),
+  importedRows: numeric("imported_rows").notNull().default("0"),
+  skippedRows: numeric("skipped_rows").notNull().default("0"),
+  errorRows: numeric("error_rows").notNull().default("0"),
   errorLog: jsonb("error_log"), // Array of error details
-  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  errorSummary: text("error_summary"),
   status: text("status", { enum: ["success", "partial", "failed"] }).notNull(),
+  uploadedBy: uuid("uploaded_by"),
+  importedAt: timestamp("imported_at").defaultNow(),
 });
 
 // drizzle-zod's inferred typings can vary across versions; cast omit shape to keep `tsc` stable.
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true } as any);
-export const insertLedgerSchema = createInsertSchema(ledger).omit({ id: true } as any);
-export const insertBillSchema = createInsertSchema(bills).omit({ id: true } as any);
+export const insertLedgerSchema = z.object({}); // Placeholder for type compatibility until removal complete
+export const insertBillSchema = z.object({}); // Placeholder for type compatibility until removal complete
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true } as any);
-export const insertUploadLogSchema = createInsertSchema(uploadLogs).omit({ id: true, uploadedAt: true } as any);
+export const insertImportLogSchema = createInsertSchema(importLogs).omit({ id: true, importedAt: true } as any);
 
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -106,6 +113,13 @@ export const invoices = pgTable("invoices", {
   source: text("source").default("system"),
   externalId: text("external_id"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Attributes from merged 'bills' table
+  locked: boolean("locked").default(false),
+  legacyBillId: bigint("legacy_bill_id", { mode: "number" }), // Temporary for migration
+}, (table) => {
+  return {
+    idxInvoiceUnique: uniqueIndex("idx_invoice_unique").on(table.invoiceNo, table.customerId),
+  };
 });
 
 export const invoiceItems = pgTable("invoice_items", {
@@ -131,13 +145,27 @@ export const stagingImports = pgTable("staging_imports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const mobileLinkRequests = pgTable("mobile_link_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  customerId: uuid("customer_id").references(() => customers.id).notNull(),
+  shopName: text("shop_name"),
+  mobile: text("mobile").notNull(),
+  status: text("status").default("pending").notNull(),
+
+  // Admin Verification Metadata
+  approvedBy: uuid("approved_by").references(() => customers.id),
+  approvedAt: timestamp("approved_at"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true } as any); // invoiceItems are usually handled manually or via a separate schema
 
 
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = typeof customers.$inferInsert;
-export type LedgerEntry = typeof ledger.$inferSelect;
-export type Bill = typeof bills.$inferSelect;
+export type LedgerEntry = any; // Deprecated
+export type Bill = any; // Deprecated
 export type Payment = typeof payments.$inferSelect;
 
 export type TallyUploadResponse = {

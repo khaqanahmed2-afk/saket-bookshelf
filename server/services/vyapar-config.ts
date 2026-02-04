@@ -1,13 +1,12 @@
 export const VYAPAR_CONFIG = {
     customers: {
-        requiredColumns: ["Party Name", "Mobile No"],
+        requiredColumns: ["Name"], // Only name is required, mobile is optional
         mappings: {
-            name: ["Party Name", "Customer Name"],
-            mobile: ["Mobile No", "Phone Number", "Contact"],
-            // Add other fields as necessary
-            gstin: ["GSTIN"],
-            email: ["Email ID"],
-            address: ["Billing Address"]
+            name: ["Name", "Party Name", "Customer Name"],
+            mobile: ["Mobile", "Phone", "Phone No", "Phone No."],
+            receivableBalance: ["Receivable Balance", "Receivable"],
+            payableBalance: ["Payable Balance", "Payable"],
+            address: ["Address", "Billing Address"]
         }
     },
     products: {
@@ -21,12 +20,12 @@ export const VYAPAR_CONFIG = {
         }
     },
     invoices: {
-        requiredColumns: ["Bill No", "Party Name", "Total"],
+        requiredColumns: ["Bill No", "Party Name", "Total"], // Documentation only
         mappings: {
-            invoiceNo: ["Bill No", "Invoice No"],
+            invoiceNo: ["Invoice No", "Invoice No.", "Bill No", "Bill Number", "Voucher No", "Ref No"],
             customerName: ["Party Name", "Customer Name"], // Used for lookup
-            date: ["Bill Date", "Date", "Invoice Date"],
-            totalAmount: ["Total", "Grand Total", "Invoice Amount"],
+            date: ["Date", "Invoice Date", "Bill Date"],
+            totalAmount: ["Amount", "Total Amount", "Invoice Amount", "Net Amount", "Grand Total", "Total"],
             paidAmount: ["Paid", "Received", "Payment Received"],
             balanceAmount: ["Balance", "Due", "Remaining Amount"],
             status: ["Payment Status", "Status"] // Optional, defaults to paid if missing or partial

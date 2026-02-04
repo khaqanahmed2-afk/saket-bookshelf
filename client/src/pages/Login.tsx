@@ -4,9 +4,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { motion } from "framer-motion";
-import { Phone, Lock, Eye, EyeOff } from "lucide-react";
+import { Phone, Lock, Eye, EyeOff, AlertCircle, Search } from "lucide-react";
+import { MobileRegistrationModal } from "@/components/MobileRegistrationModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { z } from "zod";
+
+const mobileValidationSchema = z.string().length(10, "Please enter a valid 10-digit mobile number").regex(/^\d+$/, "Only digits are allowed");
 
 export default function Login() {
   const { checkMobile, setupPin, loginWithPin } = useAuth();
@@ -17,15 +23,31 @@ export default function Login() {
 
   const [showPin, setShowPin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<{ code?: string, message?: string } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   const handlePhoneSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone) return;
+    setValidationError(null);
+    setErrorStatus(null);
+
+    const validation = mobileValidationSchema.safeParse(phone);
+    if (!validation.success) {
+      setValidationError(validation.error.errors[0].message);
+      return;
+    }
+
     setIsSubmitting(true);
-    const exists = await checkMobile(phone);
+    const data = await checkMobile(phone);
     setIsSubmitting(false);
-    if (exists) {
-      setStep("pin");
+
+    if (data.exists) {
+      if (data.verified === false) {
+        setErrorStatus({ code: 'MOBILE_UNVERIFIED', message: data.message });
+      } else {
+        setStep("pin");
+      }
     } else {
       setStep("setup");
     }
@@ -34,17 +56,25 @@ export default function Login() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (step === "setup") {
-      if (pin !== confirmPin) {
-        alert("PINs do not match");
-        setIsSubmitting(false);
-        return;
+    setErrorStatus(null);
+    try {
+      if (step === "setup") {
+        if (pin !== confirmPin) {
+          alert("PINs do not match");
+          setIsSubmitting(false);
+          return;
+        }
+        await setupPin(phone, pin);
+      } else {
+        await loginWithPin(phone, pin);
       }
-      await setupPin(phone, pin);
-    } else {
-      await loginWithPin(phone, pin);
+    } catch (error: any) {
+      if (error.code === "MOBILE_UNVERIFIED") {
+        setErrorStatus({ code: error.code, message: error.message });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   return (
@@ -77,7 +107,7 @@ export default function Login() {
               </CardDescription>
             </CardHeader>
 
-            <CardContent className="pb-12 px-10">
+            <CardContent className="pb-12 px-4 sm:px-10">
               {step === "phone" ? (
                 <form onSubmit={handlePhoneSubmit} className="space-y-6">
                   <div className="space-y-2">
@@ -85,13 +115,40 @@ export default function Login() {
                     <Input
                       id="phone"
                       type="tel"
-                      placeholder="+91 98765 43210"
+                      inputMode="numeric"
+                      placeholder="98765 43210"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="h-12 text-lg tracking-wide font-medium bg-white/80"
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                        setPhone(val);
+                        if (validationError) setValidationError(null);
+                      }}
+                      className={`pl-10 h-12 bg-slate-50 border-slate-200 rounded-xl font-bold tracking-wider focus:bg-white transition-all ${validationError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                       required
                     />
                   </div>
+                  {validationError && (
+                    <p className="text-red-500 text-xs mt-1 font-bold ml-1">{validationError}</p>
+                  )}
+                  {errorStatus?.code === 'MOBILE_UNVERIFIED' && (
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                      <Alert variant="destructive" className="bg-red-50 border-red-100 rounded-2xl p-6">
+                        <AlertCircle className="h-6 w-6 text-red-500" />
+                        <div className="ml-2">
+                          <AlertTitle className="font-black text-red-800 text-lg">Registration Needed</AlertTitle>
+                          <AlertDescription className="text-red-700 font-medium mt-1">
+                            {errorStatus.message}
+                          </AlertDescription>
+                          <Button
+                            onClick={() => setIsRegisterModalOpen(true)}
+                            className="mt-4 w-full h-12 bg-red-600 hover:bg-red-700 text-white font-black rounded-xl shadow-lg shadow-red-200"
+                          >
+                            <Search className="w-4 h-4 mr-2" /> Register My Shop
+                          </Button>
+                        </div>
+                      </Alert>
+                    </motion.div>
+                  )}
                   <ShinyButton type="submit" className="w-full h-12 text-base font-bold tracking-wide rounded-xl" disabled={isSubmitting}>
                     {isSubmitting ? "Verifying..." : "Get Started"}
                   </ShinyButton>
@@ -153,6 +210,12 @@ export default function Login() {
             </CardContent>
           </Card>
         </motion.div>
+
+        <MobileRegistrationModal
+          isOpen={isRegisterModalOpen}
+          onClose={() => setIsRegisterModalOpen(false)}
+          initialMobile={phone}
+        />
       </div>
     </Layout>
   );
